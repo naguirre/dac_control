@@ -4,8 +4,12 @@
 #define CT7302_ADDRESS 0x10
 #define NB_VAL 32
 
+#define BUTTON_PIN 2 // 2 or 3 for ISR on nano
+
+
 typedef struct Input_Sel_Config {
   byte type;
+  byte cmd;
   char *name;
   char *pretty_name;
 };
@@ -20,17 +24,18 @@ typedef enum
   INPUT_SEL_I2S_IN_0,
   INPUT_SEL_I2S_IN_1,
   INPUT_SEL_I2S_IN_2,
+  INPUT_SEL_SENTINEL,
 }Input_Sel;
 
 static Input_Sel_Config input_sel[] = {
-  {INPUT_SEL_SPDIF_IN_0, "INPUT_SEL_SPDIF_IN_0", "TV"},
-  {INPUT_SEL_SPDIF_IN_1, "INPUT_SEL_SPDIF_IN_1", "IN1"},
-  {INPUT_SEL_SPDIF_IN_2, "INPUT_SEL_SPDIF_IN_2", "IN2"},
-  {INPUT_SEL_SPDIF_IN_3, "INPUT_SEL_SPDIF_IN_3", "IN3"},
-  {INPUT_SEL_SPDIF_IN_4, "INPUT_SEL_SPDIF_IN_4", "IN4"},
-  {INPUT_SEL_I2S_IN_0, "INPUT_SEL_I2S_IN_0", "La manufacture du son"},
-  {INPUT_SEL_I2S_IN_1, "INPUT_SEL_I2S_IN_1", "I2S1"},
-  {INPUT_SEL_I2S_IN_2, "INPUT_SEL_I2S_IN_2", "I2S2"},
+  {INPUT_SEL_I2S_IN_0, 5, "INPUT_SEL_I2S_IN_0", "La manufacture du son"},
+  {INPUT_SEL_SPDIF_IN_0, 0, "INPUT_SEL_SPDIF_IN_0", "TV"},
+  {INPUT_SEL_SPDIF_IN_1, 1, "INPUT_SEL_SPDIF_IN_1", "IN1"},
+  /*{INPUT_SEL_SPDIF_IN_2, 2, "INPUT_SEL_SPDIF_IN_2", "IN2"},
+  {INPUT_SEL_SPDIF_IN_3, 3;"INPUT_SEL_SPDIF_IN_3", "IN3"},
+  {INPUT_SEL_SPDIF_IN_4, 4, "INPUT_SEL_SPDIF_IN_4", "IN4"},
+  {INPUT_SEL_I2S_IN_1, 6, "INPUT_SEL_I2S_IN_1", "I2S1"},
+  {INPUT_SEL_I2S_IN_2, 7, "INPUT_SEL_I2S_IN_2", "I2S2"},*/
 };
 
 typedef struct {
@@ -38,6 +43,8 @@ typedef struct {
   byte value;
 } CT7302_I2C_Config;
 
+
+/* Table copied from what dev board of CT7302 did on i2c at startup*/
 CT7302_I2C_Config ct7302_config[22] = {
   {0x06, 0x48},
   {0x10, 0xD0},
@@ -64,6 +71,8 @@ CT7302_I2C_Config ct7302_config[22] = {
 
 };
 
+
+int input_src = INPUT_SEL_SPDIF_IN_0;
 static unsigned int linear_val[9] = {0, 10, 56, 138, 217, 337, 674, 900, 1000};
 
 void WriteReg(byte add, byte val)
@@ -79,20 +88,19 @@ void WriteReg(byte add, byte val)
 
 }
 
+
+
+
 void setup() {
   int i = 0;
   byte val[NB_VAL] = {0};
-  for (int i = 0; i < NB_VAL; i++)
-  {
-    val[i] = 0x55;
-  }
+  
+
+  
   // put your setup code here, to run once:
   Wire.begin();
   Serial.begin(115200);
-  Serial.println("Wait for data : ");
-
-  WriteReg(0x04, 0x30 + INPUT_SEL_SPDIF_IN_0);
-  WriteReg(0x06, 0x48);
+  Serial.println("DAC Control v0.1");
 
   Wire.beginTransmission(CT7302_ADDRESS);
   Wire.write(0x0);
@@ -119,36 +127,31 @@ void setup() {
   }
   
   WriteReg(0x04, 0x30);
-
+  
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
 }
 
 
-int analog_val = 0;
-int input_src= INPUT_SEL_SPDIF_IN_0;
+int val = 0;
 
 void loop() {
-  int tmp = input_src;
-  // put your main code here, to run repeatedly:
-  analog_val = analogRead(A0);
-  //Serial.println(analog_val);
-  for (int i = 0; i < 8; i++)
-  {
-    if (analog_val >= linear_val[i] && analog_val <= linear_val[i+1])
-    {
-      tmp = i;
-      break;
-    }
-  }
- 
-  if (tmp != input_src)
-  {
-      WriteReg(0x04, 0x30 + tmp);
-      Serial.print(input_sel[tmp].pretty_name);
-      Serial.print("\t");
-      Serial.println(input_sel[tmp].name);
-      input_src = tmp;
-  }
+  
+   val = digitalRead(BUTTON_PIN);
 
-  delay(100);
+   if (!val)
+   {
+    
+     input_src++;
+     if (input_src >= 3)
+  	input_src = 0;
+     WriteReg(0x04, 0x30 + input_sel[input_src].cmd);
+     Serial.print(input_sel[input_src].pretty_name);
+     Serial.print("\t");
+     Serial.println(input_sel[input_src].name);
+     delay(300);
+
+   }
+
+
 
 }
