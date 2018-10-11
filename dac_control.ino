@@ -148,7 +148,7 @@ void loop() {
      Serial.print(input_sel[input_src].pretty_name);
      Serial.print("\t");
      Serial.println(input_sel[input_src].name);
-     delay(300);
+     delay(200);
 
    }
 
